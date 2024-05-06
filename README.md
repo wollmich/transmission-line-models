@@ -13,7 +13,7 @@ A set of scripts for analytically modeling certain transmission lines and wavegu
 - Rectangular waveguide (see [`rw.py`][rw])
 - Coaxial (see [`coax.py`][coax])
 - Coplanar waveguide (see [`cpw.py`][cpw])
-- Microstrip (in to-do list)
+- Microstrip (see [`ms.py`][ms])
 - Stripline (in to-do list)
 - Grounded CPW (in to-do list)
 
@@ -76,7 +76,13 @@ jac_Z0    = rw.jac_Z0
 
 - F. M. Tesche, "A Simple Model for the Line Parameters of a Lossy Coaxial Cable Filled With a Nondispersive Dielectric," in IEEE Transactions on Electromagnetic Compatibility, vol. 49, no. 1, pp. 12-17, Feb. 2007, doi: 10.1109/TEMC.2006.888185. <https://ieeexplore.ieee.org/document/4106102>
 
+### _Microstrip_
+
+- F. Schneider and W. Heinrich, "Model of thin-film microstrip line for circuit design," 
+in IEEE Transactions on Microwave Theory and Techniques, 
+vol. 49, no. 1, pp. 104-110, Jan. 2001, doi: 10.1109/22.899967. <https://ieeexplore.ieee.org/document/899967>
 
 [rw]: https://github.com/ZiadHatab/transmission-line-models/blob/main/rw.py
 [cpw]: https://github.com/ZiadHatab/transmission-line-models/blob/main/cpw.py
 [coax]: https://github.com/ZiadHatab/transmission-line-models/blob/main/coax.py
+[ms]: https://github.com/ZiadHatab/transmission-line-models/blob/main/ms.py
