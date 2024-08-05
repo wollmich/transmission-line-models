@@ -233,7 +233,7 @@ class MS:
     tand : float number
         loss tangent.
     """
-    def __init__(self, w, h, t, wg, f, mur=1, sr=1, er=1, tand=0):
+    def __init__(self, w, h, t, wg, f, mur=1, sr=1, er=1.00001, tand=0):
         self.w    = w
         self.h    = h
         self.t    = t
