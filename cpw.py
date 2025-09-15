@@ -23,23 +23,23 @@ import scipy.special as ssp
 import scipy.optimize as so
 
 ## Functions below are needed to implement the cpw model based on [1] and [2].
-def K(x):
+def K(k):
     # Complete elliptic integral of the first kind
     # Based on Eq. (14) in [1].
-    return ssp.ellipk(x)
+    return ssp.ellipk(k**2)
 
 def Kp(k):
     # Based on Eq. (14) in [1].
-    return K(np.sqrt(1-k**2))
+    return ssp.ellipk(1-k**2)
 
-def E(x):
+def E(k):
     # Complete elliptic integral of the second kind
     # Based on Eq. (14) in [1].
-    return ssp.ellipe(x)
+    return ssp.ellipe(k**2)
  
 def Ep(k):
     # Based on Eq. (14) in [1].
-    return E(np.sqrt(1-k**2))
+    return ssp.ellipe(1-k**2)
 
 def PI(n,m):
     # Complete elliptic integral of the third kind
