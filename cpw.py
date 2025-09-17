@@ -89,7 +89,7 @@ def C_v1(w,s,wg,t,er):
     # er is the real part of the relative permittivity.
     # Based on Eq. (2) in [1].
     er  = er.real  # force to take the real-part
-    ep0 = 8.8541878128e-12
+    ep0 = 8.8541878187894329E-12
     Fup  = F(w,s,wg,t)
     k0 = w/(w+2*s)
     k1 = k0*np.sqrt( (1-((w+2*s)/(w+2*s+2*wg))**2)/(1-(w/(w+2*s+2*wg))**2) )
@@ -101,7 +101,7 @@ def G_v1(w,s,wg,t,er,tand,f):
     # er is the real part of the relative permittivity.
     # Based on Eq. (2) in [1].
     er  = er.real  # force to take the real-part
-    ep0 = 8.8541878128e-12
+    ep0 = 8.8541878187894329E-12
     k0 = w/(w+2*s)
     k1 = k0*np.sqrt( (1-((w+2*s)/(w+2*s+2*wg))**2)/(1-(w/(w+2*s+2*wg))**2) )
     Flow = K(k1)/Kp(k1)
@@ -112,7 +112,7 @@ def R_v1(w,s,wg,t,f,sigma=5.8e7):
     # This function only process a single frequency point.
     # sigma is the conductivity. in [1] the letter kappa was used.
     # Based on Eqs. (6) and (7) in [1].
-    mu0 = 1.25663706212e-6
+    mu0 = 1.25663706127e-6
     omega = 2*np.pi*f
     omega_c1 = np.sqrt(2)*4/mu0/sigma/t/w
     omega_c2 = 8/mu0/sigma*((w+t)/w/t)**2
@@ -186,7 +186,7 @@ def L_v1(w,s,wg,t,f,sigma=5.8e7):
     # This function only process a single frequency point.
     # sigma is the conductivity. in [1] the letter kappa was used.
     # Based on Eq. (9) in [1]
-    mu0 = 1.25663706212e-6
+    mu0 = 1.25663706127e-6
     omega = 2*np.pi*f
     omega_L0 = 4/mu0/sigma/t/wg
     omega_L1 = 4/mu0/sigma/t/w
@@ -260,8 +260,8 @@ def L_v1(w,s,wg,t,f,sigma=5.8e7):
 def R_rad(w,s,wg,t,f,er):
     # Implementation of added radiation loss as series per-unit-length resistance. 
     # Based on Eq. (16) in [2].
-    mu0 = 1.25663706212e-6
-    ep0 = 8.8541878128e-12
+    mu0 = 1.25663706127e-6
+    ep0 = 8.8541878187894329E-12
     omega = 2*np.pi*f
     er  = er.real
     erq = (er + 1)/2 
@@ -340,8 +340,8 @@ class CPW:
         self.update()  # run the code
 
     def update(self):
-        mu0 = 1.25663706212e-6
-        ep0 = 8.8541878128e-12
+        mu0 = 1.25663706127e-6
+        ep0 = 8.8541878187894329E-12
         c0  = 1/np.sqrt(mu0*ep0) # 299792458 # speed of light in vacuum (m/s)
         
         w       = self.w
@@ -448,8 +448,8 @@ if __name__=='__main__':
     import matplotlib.pyplot as plt # for plotting
 
     # constants
-    mu0 = 1.25663706212e-6
-    ep0 = 8.8541878128e-12
+    mu0 = 1.25663706127e-6
+    ep0 = 8.8541878187894329E-12
     c0  = 1/np.sqrt(mu0*ep0) # 299792458   # speed of light in vacuum (m/s)
     # useful functions
     mag2db = lambda x: 20*np.log10(abs(x))
