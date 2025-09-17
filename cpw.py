@@ -145,7 +145,7 @@ def R_v1(w,s,wg,t,f,sigma=5.8e7):
         FgL = 1/2/s + tH/s**2 + pc0/s*( np.pi*a/(a+b) + pc6/2 + 1/8*( -a/b*pc1 + a/b*pc3*(pc1+2) - pc4 - 2*(a**2+b**2)/b/(a+b) ) )
 
     # Modifications based on the FORTAN code from Heinrich 1993
-    omega_c1 = omega_c1*np.sqrt(2)
+    omega_c1 = omega_c1/np.sqrt(2)
     FcL = FcL * (1 - 0.1 * (a/b)**2)
     FgL = FgL * (1 - 0.1 * (a/b)**2)
 
