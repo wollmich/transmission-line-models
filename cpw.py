@@ -375,7 +375,7 @@ class CPW:
         R_corr = np.array([R_rad(w,s,wg,t,ff,er_real) for ff in f])
       
         # correction based on [3]
-        # updating alpha = Re{gamma}
+        # updating R_corr
         f1 = 1 + 0.45*(w/d)**4
         f2 = 1.87 + 273.18/( 47.6 + 1.29*(er_real-9)**2 )
         f3 = wg/wtot
