@@ -271,7 +271,7 @@ def R_rad(w,s,wg,t,f,er):
     r1 = a/b
     r2 = np.sqrt((c**2-b**2)/(c**2-a**2))
     r = r1*r2
-    return mu0**3*ep0**2*omega**5/16/er*(er-erq)**3*(np.sqrt(8)-2.75)*( (b**2-a**2)*(K(np.sqrt(r))-PI(r1,r)-PI(r2,r))/K(np.sqrt(r)) )**2
+    return mu0**3*ep0**2*omega**5/16/er*(er-erq)**3*(np.sqrt(8)-2.75)*( (b**2-a**2)*(K(r)-PI(r1,r)-PI(r2,r))/K(r) )**2
 
 
 def get_all_paras(x, cpw):
