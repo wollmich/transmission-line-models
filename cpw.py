@@ -256,6 +256,22 @@ def L_v1(w,s,wg,t,f,sigma=5.8e7):
     else:
         return Linf + np.sqrt(mu0/2/omega/sigma)*(FcL + FgL)/4/F0**2*(1 + aL5*(omega_L2/omega))
 
+def C_er_v1(w,s,wg,t,er):
+    er  = er.real  # force to take the real-part
+    ep0 = 8.8541878187894329E-12
+    Fup  = F(w,s,wg,t)
+    k0 = w/(w+2*s)
+    k1 = k0*np.sqrt( (1-((w+2*s)/(w+2*s+2*wg))**2)/(1-(w/(w+2*s+2*wg))**2) )
+    Flow = K(k1)/Kp(k1)
+    return 2*ep0*er*(Fup + Flow)
+
+def C_q_v1(w,s,wg,t,er):
+    er  = er.real  # force to take the real-part
+    ep0 = 8.8541878187894329E-12
+    k0 = w/(w+2*s)
+    k1 = k0*np.sqrt( (1-((w+2*s)/(w+2*s+2*wg))**2)/(1-(w/(w+2*s+2*wg))**2) )
+    Flow = K(k1)/Kp(k1)
+    return 2*ep0*(1 + er)*Flow
 
 def R_rad(w,s,wg,t,f,er):
     # Implementation of added radiation loss as series per-unit-length resistance. 
@@ -367,9 +383,15 @@ class CPW:
         fg = 2*c0/wtot/np.sqrt(2*(er_real-1))
         d = w + 2*s
         p = 2.86465*(d/wtot)**2/(0.15075+d/wtot)
+        # Correction factor based on the Schnieder paper
         erq = (er_real + 1)/2
-        x = 1 + (np.sqrt(er_real/erq)-1)*p*(f/fg)**2  # correction factor
-        C_corr = (x-1)*(C - R*G/L/omega**2)
+        x_paper = 1 + (np.sqrt(er_real/erq)-1)*p*(f/fg)**2
+        # Correction factor based on the FORTRAN Code V3.1
+        C_er = np.array([C_er_v1(w,s,wg,t,er_real) for ff in f])
+        C_q = np.array([C_q_v1(w,s,wg,t,er_real) for ff in f])
+        x_fortran = 1 + (np.sqrt(C_er/C_q)-1)*p*(f/fg)**2
+
+        C_corr = (x_fortran - 1)*C
         C = C + C_corr
         # updating R
         R_corr = np.array([R_rad(w,s,wg,t,ff,er_real) for ff in f])
