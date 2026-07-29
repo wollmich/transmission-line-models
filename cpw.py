@@ -1,5 +1,5 @@
 '''
-@author: Ziad (zi.hatab@gmail.com)
+@author: Ziad Hatab (zi.hatab@gmail.com)
 
 This is an implementation of a co-planar waveguide model based on the references [1-3] (see the class CPW). 
 Reference [1] is the base implementation, whereas [2] and [3] add modification on [1] to account for radiation effects.
@@ -21,6 +21,11 @@ https://ieeexplore.ieee.org/document/9338133
 import numpy as np
 import scipy.special as ssp
 import scipy.optimize as so
+
+# physical constants
+mu0 = 1.25663706127e-6  # vacuum permeability in H/m (CODATA 2022)
+ep0 = 8.8541878188e-12  # vacuum permittivity in F/m (CODATA 2022)
+c0  = 1/np.sqrt(mu0*ep0)  # speed of light in vacuum in m/s
 
 ## Functions below are needed to implement the cpw model based on [1] and [2].
 def K(k):
@@ -88,8 +93,6 @@ def C_v1(w,s,wg,t,er):
     # This function only process a single frequency point.
     # er is the real part of the relative permittivity.
     # Based on Eq. (2) in [1].
-    er  = er.real  # force to take the real-part
-    ep0 = 8.8541878187894329E-12
     Fup  = F(w,s,wg,t)
     k0 = w/(w+2*s)
     k1 = k0*np.sqrt( (1-((w+2*s)/(w+2*s+2*wg))**2)/(1-(w/(w+2*s+2*wg))**2) )
@@ -100,19 +103,16 @@ def G_v1(w,s,wg,t,er,tand,f):
     # This function only process a single frequency point.
     # er is the real part of the relative permittivity.
     # Based on Eq. (2) in [1].
-    er  = er.real  # force to take the real-part
-    ep0 = 8.8541878187894329E-12
     k0 = w/(w+2*s)
     k1 = k0*np.sqrt( (1-((w+2*s)/(w+2*s+2*wg))**2)/(1-(w/(w+2*s+2*wg))**2) )
     Flow = K(k1)/Kp(k1)
     omega = 2*np.pi*f
     return 2*omega*ep0*er*tand*Flow
 
-def R_v1(w,s,wg,t,f,sigma=5.8e7):
+def R_v1(w,s,wg,t,f,sigma=58e6):
     # This function only process a single frequency point.
     # sigma is the conductivity. in [1] the letter kappa was used.
     # Based on Eqs. (6) and (7) in [1].
-    mu0 = 1.25663706127e-6
     omega = 2*np.pi*f
     omega_c1 = np.sqrt(2)*4/mu0/sigma/t/w
     omega_c2 = 8/mu0/sigma*((w+t)/w/t)**2
@@ -182,11 +182,10 @@ def R_v1(w,s,wg,t,f,sigma=5.8e7):
     return Rc + Rg
 
 
-def L_v1(w,s,wg,t,f,sigma=5.8e7):
+def L_v1(w,s,wg,t,f,sigma=58e6):
     # This function only process a single frequency point.
     # sigma is the conductivity. in [1] the letter kappa was used.
     # Based on Eq. (9) in [1]
-    mu0 = 1.25663706127e-6
     omega = 2*np.pi*f
     omega_L0 = 4/mu0/sigma/t/wg
     omega_L1 = 4/mu0/sigma/t/w
@@ -260,10 +259,7 @@ def L_v1(w,s,wg,t,f,sigma=5.8e7):
 def R_rad(w,s,wg,t,f,er):
     # Implementation of added radiation loss as series per-unit-length resistance. 
     # Based on Eq. (16) in [2].
-    mu0 = 1.25663706127e-6
-    ep0 = 8.8541878187894329E-12
     omega = 2*np.pi*f
-    er  = er.real
     erq = (er + 1)/2 
     a = w/2
     b = w/2 + s
@@ -279,13 +275,14 @@ def get_all_paras(x, cpw):
     This function is used to collect all output parameters as real-valued equivalent to compute 
     the Jacobian of them with respect to input parameters.
     '''
-    # x = [ w,s,wg,t,f,Dk,Df,sigma ]  # this is the order of the inputs
+    # x = [w, s, wg, t, sigma, er, tand]
     cpw.w     = x[0]
     cpw.s     = x[1]
     cpw.wg    = x[2]
     cpw.t     = x[3]
-    cpw.er    = x[4]*(1-1j*x[5])
-    cpw.sigma = x[6]
+    cpw.sigma = x[4]
+    cpw.er    = x[5]
+    cpw.tand  = x[6]
     cpw.update()
     # convert complex-valued array to real-valued equivalent
     hh = lambda x: np.kron(x.real, [1,0]) + np.kron(x.imag, [0,1])
@@ -323,65 +320,64 @@ class CPW:
         thickness of the conductor (the same for signal and grounds)
     f : number or 1d-array
         frequency 
-    er : complex number
-        complex relative permittivity of the substrate. If you have the real-values Dk and Df, then er = Dk*(1-1j*Df)
-    sigma : number (default 5.8e7)
-        conductivity of the conductor (the same for signal and grounds)
+    sigma : number (default 58e6)
+        conductivity in S/m (the same for signal and grounds). 58e6 is annealed copper (100% IACS).
+    er : float number
+        real-part relative permittivity of the substrate.
+    tand : float number
+        loss tangent.
     """
 
-    def __init__(self,w,s,wg,t,f,er,sigma=5.8e7):
+    def __init__(self,w,s,wg,t,f,sigma=58e6,er=1,tand=0):
         self.w     = w
         self.s     = s
         self.wg    = wg
         self.t     = t
         self.f     = np.atleast_1d(f)
-        self.er    = er
         self.sigma = sigma
+        self.er    = er
+        self.tand  = tand
         self.update()  # run the code
 
     def update(self):
-        mu0 = 1.25663706127e-6
-        ep0 = 8.8541878187894329E-12
-        c0  = 1/np.sqrt(mu0*ep0) # 299792458 # speed of light in vacuum (m/s)
-        
         w       = self.w
         s       = self.s
         wg      = self.wg
         t       = self.t
         f       = self.f
-        er_real = self.er.real
-        tand    = -self.er.imag/self.er.real
         sigma   = self.sigma
+        er      = self.er
+        tand    = self.tand
         
         omega = 2*np.pi*f
         
         # based on [1]
-        C = np.array([C_v1(w,s,wg,t,er_real) for ff in f])
-        G = np.array([G_v1(w,s,wg,t,er_real,tand,ff) for ff in f])
+        C = np.array([C_v1(w,s,wg,t,er) for ff in f])
+        G = np.array([G_v1(w,s,wg,t,er,tand,ff) for ff in f])
         R = np.array([R_v1(w,s,wg,t,ff,sigma) for ff in f])
         L = np.array([L_v1(w,s,wg,t,ff,sigma) for ff in f])
 
         # correction based on [2]
         # updating C
         wtot = w + 2*s + 2*wg
-        fg = 2*c0/wtot/np.sqrt(2*(er_real-1))
+        fg = 2*c0/wtot/np.sqrt(2*(er-1))
         d = w + 2*s
         p = 2.86465*(d/wtot)**2/(0.15075+d/wtot)
-        erq = (er_real + 1)/2
-        x = 1 + (np.sqrt(er_real/erq)-1)*p*(f/fg)**2  # correction factor
+        erq = (er + 1)/2
+        x = 1 + (np.sqrt(er/erq)-1)*p*(f/fg)**2  # correction factor
         C_corr = (x-1)*(C - R*G/L/omega**2)
         C = C + C_corr
         # updating R
-        R_corr = np.array([R_rad(w,s,wg,t,ff,er_real) for ff in f])
+        R_corr = np.array([R_rad(w,s,wg,t,ff,er) for ff in f])
         R = R + R_corr        
         gamma = np.sqrt( (R + 1j*omega*L)*(G + 1j*omega*C) )
       
         # correction based on [3]
         # updating alpha = Re{gamma}
         f1 = 1 + 0.45*(w/d)**4
-        f2 = 1.87 + 273.18/( 47.6 + 1.29*(er_real-9)**2 )
+        f2 = 1.87 + 273.18/( 47.6 + 1.29*(er-9)**2 )
         f3 = wg/wtot
-        fg1 = 2*c0/1.1/wtot/np.sqrt(2*(er_real-1))
+        fg1 = 2*c0/1.1/wtot/np.sqrt(2*(er-1))
         gamma = gamma.real*( 1 + f1*f2*f3/(1 + 19.83*(f/fg1-1)**2) ) + 1j*gamma.imag
 
         # Final results
@@ -414,15 +410,18 @@ class CPW:
         s       = self.s
         wg      = self.wg
         t       = self.t
-        er_real = self.er.real
-        tand    = -self.er.imag/self.er.real
         sigma   = self.sigma
+        er      = self.er
+        tand    = self.tand
         
         N = len(self.f)
         M = 2*N
-        eps = np.sqrt(np.finfo(float).eps)
-        x   = [w, s, wg, t, er_real, tand, sigma]  # the order of the input parameters for the Jacobian
-        big_J = so.approx_fprime(x, get_all_paras, [eps]*(len(x)-1) + [eps**2], self)
+        x   = [w, s, wg, t, sigma, er, tand]  # the order of the input parameters for the Jacobian
+        # Finite-difference step, proportional to each parameter so that they all get the
+        # same relative nudge. A single fixed step cannot suit both sigma (order 1e7) and a
+        # dimension (order 1e-6). Parameters that are exactly zero fall back to an absolute step.
+        rel = 1e-6
+        big_J = so.approx_fprime(x, get_all_paras, rel*np.where(np.abs(x) > 0, np.abs(x), 1), self)
         
         # split the jacobian for the corresponding output parameters
         self.jac_gamma = big_J[:M].reshape((N,2,-1))
@@ -440,17 +439,14 @@ class CPW:
         self.s     = s
         self.wg    = wg
         self.t     = t
-        self.er    = er_real*(1-1j*tand)
         self.sigma = sigma
+        self.er    = er
+        self.tand  = tand
         
 
 if __name__=='__main__':
     import matplotlib.pyplot as plt # for plotting
 
-    # constants
-    mu0 = 1.25663706127e-6
-    ep0 = 8.8541878187894329E-12
-    c0  = 1/np.sqrt(mu0*ep0) # 299792458   # speed of light in vacuum (m/s)
     # useful functions
     mag2db = lambda x: 20*np.log10(abs(x))
     db2mag = lambda x: 10**(x/20)
@@ -464,7 +460,7 @@ if __name__=='__main__':
     Df = 0.0
     sigma = 4.11e7 
     
-    cpw = CPW(w,s,wg,t,f,Dk*(1-1j*Df),sigma)
+    cpw = CPW(w,s,wg,t,f,sigma=sigma,er=Dk,tand=Df)
     gamma_cpw = cpw.gamma
     Z0_cpw = cpw.Z0
     

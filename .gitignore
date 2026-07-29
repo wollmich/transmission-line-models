@@ -1,2 +1,33 @@
 **/__pycache__/
 **/.vscode/
+
+# Local scratch folder (never synced)
+_dont_sync/
+
+# AI assistant junk files/folders
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+.mcp.json
+.cursor/
+.cursorrules
+.cursorignore
+.cursorindexingignore
+.windsurf/
+.windsurfrules
+.aider*
+.github/copilot-instructions.md
+.copilot/
+.continue/
+.codeium/
+.gemini/
+GEMINI.md
+.qodo/
+.roo/
+.cline/
+.clinerules
+.sourcegraph/
+.tabnine/
+.specstory/
+.ai/
+AGENTS.md
