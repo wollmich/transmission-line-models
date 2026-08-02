@@ -19,7 +19,7 @@ A set of scripts for analytically modeling certain transmission lines and wavegu
 
 ## Code dependencies
 
-Please check the header of each script, but in general, [`numpy`](https://github.com/numpy/numpy) and [`scipy`](https://github.com/scipy/scipy) are always used. The package [`scipy`](https://github.com/scipy/scipy) is primarily used for derivatives and special functions. The example at the bottom of each script also uses [`matplotlib`](https://matplotlib.org/) for plotting.
+Please check the header of each script, but in general, [`numpy`](https://github.com/numpy/numpy) is always used, and [`scipy`](https://github.com/scipy/scipy) wherever special functions are needed. The example at the bottom of each script also uses [`matplotlib`](https://matplotlib.org/) for plotting.
 
 ```python
 python -m pip install numpy scipy matplotlib -U
@@ -54,6 +54,17 @@ rw.update_jac()  # compute the jacobian (by default not computed)
 jac_gamma = rw.jac_gamma
 jac_ereff = rw.jac_ereff
 jac_Z0    = rw.jac_Z0
+```
+
+## Frequency-dependent material properties
+
+Each material property may be a single number or a 1D array with one value per frequency. The geometry must be independent of frequency. The Jacobian is computed at each frequency with respect to the corresponding parameter value.
+
+```python
+f    = np.linspace(60, 90, 250)*1e9
+er   = 3.0 - 0.02*np.log(f/1e9)  # one value per frequency
+tand = 0.002 + 1e-14*f           # likewise
+rw   = RW(w=w, h=h, f=f, sigma=sigma, er=er, tand=tand)
 ```
 
 ## References
