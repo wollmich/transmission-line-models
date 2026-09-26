@@ -83,6 +83,8 @@ rw   = RW(w=w, h=h, f=f, sigma=sigma, er=er, tand=tand)
 
 [3] G. N. Phung, U. Arz, K. Kuhlmann, R. Doerner, and W. Heinrich, "Improved Modeling of Radiation Effects in Coplanar Waveguides with Finite Ground Width," 2020 50th European Microwave Conference (EuMC), 2021, pp. 404-407, doi: [10.23919/EuMC48046.2021.9338133](https://doi.org/10.23919/EuMC48046.2021.9338133).
 
+[4] B. Eckmann, M. Wollensack, L. Ausden, J. Hoffmann, and M. Zeier, "VNA Tools: Material Parameters Extraction from On-Wafer CPW S-Parameter Measurements," 2026 106th ARFTG Microwave Measurement Conference (ARFTG), 2026, doi: [10.1109/ARFTG68976.2026.11475009](https://doi.org/10.1109/ARFTG68976.2026.11475009).
+
 ### _Coaxial_
 
 [1] F. M. Tesche, "A Simple Model for the Line Parameters of a Lossy Coaxial Cable Filled With a Nondispersive Dielectric," IEEE Transactions on Electromagnetic Compatibility, vol. 49, no. 1, pp. 12-17, Feb. 2007, doi: [10.1109/TEMC.2006.888185](https://doi.org/10.1109/TEMC.2006.888185).

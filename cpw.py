@@ -1,8 +1,13 @@
 '''
 @author: Ziad Hatab (zi.hatab@gmail.com)
 
-This is an implementation of a co-planar waveguide model based on the references [1-3] (see the class CPW). 
+This is an implementation of a co-planar waveguide model based on the references [1-4] (see the class CPW).
 Reference [1] is the base implementation, whereas [2] and [3] add modification on [1] to account for radiation effects.
+The conductor-loss formulas of [1] include the corrections of Heinrich's FORTRAN code, as reported in [4].
+
+Every material property (sigma, er, tand) takes either a single number or a 1d-array with
+one value per frequency, so a dispersion model of your own can be fed in directly. The
+geometry cannot depend on frequency.
 
 [1] W. Heinrich, "Quasi-TEM description of MMIC coplanar lines including conductor-loss effects," 
 in IEEE Transactions on Microwave Theory and Techniques, vol. 41, no. 1, pp. 45-52, Jan. 1993, doi: 10.1109/22.210228.
@@ -15,17 +20,40 @@ https://ieeexplore.ieee.org/document/1159676
 [3] G. N. Phung, U. Arz, K. Kuhlmann, R. Doerner and W. Heinrich, "Improved Modeling of Radiation Effects in Coplanar Waveguides with Finite Ground Width," 
 2020 50th European Microwave Conference (EuMC), 2021, pp. 404-407, doi: 10.23919/EuMC48046.2021.9338133.
 https://ieeexplore.ieee.org/document/9338133
+
+[4] B. Eckmann, M. Wollensack, L. Ausden, J. Hoffmann and M. Zeier, "VNA Tools: Material Parameters Extraction from On-Wafer CPW S-Parameter Measurements,"
+2026 106th ARFTG Microwave Measurement Conference (ARFTG), 2026, doi: 10.1109/ARFTG68976.2026.11475009.
+https://doi.org/10.1109/ARFTG68976.2026.11475009
 '''
 
 # pip install numpy scipy -U
 import numpy as np
 import scipy.special as ssp
-import scipy.optimize as so
 
 # physical constants
 mu0 = 1.25663706127e-6  # vacuum permeability in H/m (CODATA 2022)
 ep0 = 8.8541878188e-12  # vacuum permittivity in F/m (CODATA 2022)
 c0  = 1/np.sqrt(mu0*ep0)  # speed of light in vacuum in m/s
+
+def approx_jac(x, fun, obj, rel=1e-6):
+    '''
+    Forward-difference jacobian of fun(x,obj), where x holds one row per input parameter
+    and one value per frequency. Replaces scipy.optimize.approx_fprime, which only takes
+    scalar parameters.
+
+    The step is relative to each parameter, so that sigma (order 1e7) and a dimension
+    (order 1e-6) get the same nudge, and absolute where a parameter is zero.
+    '''
+    f0 = fun(x, obj)
+    J  = np.empty((len(f0), len(x)))
+    for k, row in enumerate(x):
+        h  = rel*np.where(np.abs(row) > 0, np.abs(row), 1)
+        xp = list(x)
+        xp[k] = row + h
+        h  = (xp[k] - row).real  # the step actually taken, after rounding
+        # the step repeats over real and imaginary part, and over every output block
+        J[:,k] = (fun(xp, obj) - f0)/np.tile(np.repeat(h, 2), len(f0)//len(row)//2)
+    return J
 
 ## Functions below are needed to implement the cpw model based on [1] and [2].
 def K(k):
@@ -112,9 +140,9 @@ def G_v1(w,s,wg,t,er,tand,f):
 def R_v1(w,s,wg,t,f,sigma=58e6):
     # This function only process a single frequency point.
     # sigma is the conductivity. in [1] the letter kappa was used.
-    # Based on Eqs. (6) and (7) in [1].
+    # Based on Eqs. (6) and (7) in [1], with the corrections of Heinrich's FORTRAN code reported in [4].
     omega = 2*np.pi*f
-    omega_c1 = np.sqrt(2)*4/mu0/sigma/t/w
+    omega_c1 = np.sqrt(2)*(np.sqrt(2)*4/mu0/sigma/t/w)  # Eq. (14) in [4]
     omega_c2 = 8/mu0/sigma*((w+t)/w/t)**2
     omega_g1 = 2/mu0/sigma/t/wg
     omega_g2 = 2/mu0/sigma*((2*wg+t)/wg/t)**2
@@ -142,8 +170,11 @@ def R_v1(w,s,wg,t,f,sigma=58e6):
                              )
     else:
         FcL = 1/2/s + tH/s**2 + pc0/s*( np.pi*b/(a+b) + pc6/2 + 1/8*( -pc1 + pc3*(pc1+2) - b/a*pc4 - 2*(a**2+b**2)/a/(a+b) ) )
-        FgL = 1/2/s + tH/s**2 + pc0/s*( np.pi*a/(a+b) + pc6/2 + 1/8*( -a/b*pc1 + a/b*pc3*(pc1+2) - pc4 - 2*(a**2+b**2)/b/(a+b) ) )
+        FgL = 1/2/s + tH/s**2 + pc0/s*( np.pi*a/(a+b) - pc6/2 + 1/8*( -a/b*pc1 + a/b*pc3*(pc1+2) - pc4 - 2*(a**2+b**2)/b/(a+b) ) )
             
+    # Eqs. (15) and (16) in [4]
+    FcL = FcL*(1 - 0.1*(a/b)**2)
+    FgL = FgL*(1 - 0.1*(a/b)**2)
     F0 = F(w,s,wg,t/2)
     
     Rc0 = 1/sigma/w/t
@@ -154,7 +185,7 @@ def R_v1(w,s,wg,t,f,sigma=58e6):
     vc = np.log(Rc0/Rc1)/np.log(omega_c1/omega_c2)
     vg = np.log(Rg0/Rg1)/np.log(omega_g1/omega_g2)
     
-    gamma_c = (omega_c1/omega_c2)**2 # (w*t/np.sqrt(2)/(w+t)**2)**2
+    gamma_c = (omega_c1/omega_c2)**2 # (w*t/(w+t)**2)**2
     gamma_g = (omega_g1/omega_g2)**2 # (wg*t/(2*wg+t)**2)**2
     
     a4 = lambda v, gamma: ( gamma*v + 1/4*(1/2-v)*(4-v*(1-gamma**2)) )/( 4-v-1/4*(1/2-v)*(4-v*(1-gamma**2)) )
@@ -181,11 +212,10 @@ def R_v1(w,s,wg,t,f,sigma=58e6):
     
     return Rc + Rg
 
-
 def L_v1(w,s,wg,t,f,sigma=58e6):
     # This function only process a single frequency point.
     # sigma is the conductivity. in [1] the letter kappa was used.
-    # Based on Eq. (9) in [1]
+    # Based on Eq. (9) in [1], with the corrections of Heinrich's FORTRAN code reported in [4].
     omega = 2*np.pi*f
     omega_L0 = 4/mu0/sigma/t/wg
     omega_L1 = 4/mu0/sigma/t/w
@@ -221,8 +251,11 @@ def L_v1(w,s,wg,t,f,sigma=58e6):
                              )
     else:
         FcL = 1/2/s + tH/s**2 + pc0/s*( np.pi*b/(a+b) + pc6/2 + 1/8*( -pc1 + pc3*(pc1+2) - b/a*pc4 - 2*(a**2+b**2)/a/(a+b) ) )
-        FgL = 1/2/s + tH/s**2 + pc0/s*( np.pi*a/(a+b) + pc6/2 + 1/8*( -a/b*pc1 + a/b*pc3*(pc1+2) - pc4 - 2*(a**2+b**2)/b/(a+b) ) )
+        FgL = 1/2/s + tH/s**2 + pc0/s*( np.pi*a/(a+b) - pc6/2 + 1/8*( -a/b*pc1 + a/b*pc3*(pc1+2) - pc4 - 2*(a**2+b**2)/b/(a+b) ) )
     
+    # Eqs. (15) and (16) in [4]
+    FcL = FcL*(1 - 0.1*(a/b)**2)
+    FgL = FgL*(1 - 0.1*(a/b)**2)
     F0 = F(w,s,wg,t/2)
     F1 = F0 + K(k2)/Kp(k2) - K(k1)/Kp(k1)
     
@@ -255,7 +288,6 @@ def L_v1(w,s,wg,t,f,sigma=58e6):
     else:
         return Linf + np.sqrt(mu0/2/omega/sigma)*(FcL + FgL)/4/F0**2*(1 + aL5*(omega_L2/omega))
 
-
 def R_rad(w,s,wg,t,f,er):
     # Implementation of added radiation loss as series per-unit-length resistance. 
     # Based on Eq. (16) in [2].
@@ -269,17 +301,17 @@ def R_rad(w,s,wg,t,f,er):
     r = r1*r2
     return mu0**3*ep0**2*omega**5/16/er*(er-erq)**3*(np.sqrt(8)-2.75)*( (b**2-a**2)*(K(r)-PI(r1**2,r**2)-PI(r2**2,r**2))/K(r) )**2
 
-
 def get_all_paras(x, cpw):
     '''
     This function is used to collect all output parameters as real-valued equivalent to compute 
     the Jacobian of them with respect to input parameters.
     '''
-    # x = [w, s, wg, t, sigma, er, tand]
-    cpw.w     = x[0]
-    cpw.s     = x[1]
-    cpw.wg    = x[2]
-    cpw.t     = x[3]
+    # x = [w, s, wg, t, sigma, er, tand], one row each, of length len(f). The geometry
+    # cannot change with frequency, so only the first entry of its rows is taken.
+    cpw.w     = x[0][0]
+    cpw.s     = x[1][0]
+    cpw.wg    = x[2][0]
+    cpw.t     = x[3][0]
     cpw.sigma = x[4]
     cpw.er    = x[5]
     cpw.tand  = x[6]
@@ -306,7 +338,7 @@ def get_all_paras(x, cpw):
 
 class CPW:
     """
-    Analytical model of Co-planar waveguide (CPW) based on [1-3] (see comments at top of this file).
+    Analytical model of Co-planar waveguide (CPW) based on [1-4] (see comments at top of this file).
 
     Parameters
     ----------
@@ -319,16 +351,23 @@ class CPW:
     t : number
         thickness of the conductor (the same for signal and grounds)
     f : number or 1d-array
-        frequency 
-    sigma : number (default 58e6)
+        frequency
+    sigma : number or 1d-array (default 58e6)
         conductivity in S/m (the same for signal and grounds). 58e6 is annealed copper (100% IACS).
-    er : float number
+    er : number or 1d-array
         real-part relative permittivity of the substrate.
-    tand : float number
+    tand : number or 1d-array
         loss tangent.
+    phung_fit : bool (default True)
+        apply the empirical correction of [3] to the radiation loss of [2].
+
+    Notes
+    -----
+    A material property given as a 1d-array holds one value per frequency; the geometry
+    w, s, wg and t is scalar.
     """
 
-    def __init__(self,w,s,wg,t,f,sigma=58e6,er=1,tand=0):
+    def __init__(self,w,s,wg,t,f,sigma=58e6,er=1,tand=0,phung_fit=True):
         self.w     = w
         self.s     = s
         self.wg    = wg
@@ -337,6 +376,7 @@ class CPW:
         self.sigma = sigma
         self.er    = er
         self.tand  = tand
+        self.phung_fit = phung_fit
         self.update()  # run the code
 
     def update(self):
@@ -345,17 +385,20 @@ class CPW:
         wg      = self.wg
         t       = self.t
         f       = self.f
-        sigma   = self.sigma
-        er      = self.er
-        tand    = self.tand
-        
+        # every material property gets one value per frequency. 
+        # the geometry cannot change with frequency and is left alone.
+        ones    = np.ones_like(f)
+        sigma   = ones*self.sigma
+        er      = ones*self.er
+        tand    = ones*self.tand
+
         omega = 2*np.pi*f
-        
+
         # based on [1]
-        C = np.array([C_v1(w,s,wg,t,er) for ff in f])
-        G = np.array([G_v1(w,s,wg,t,er,tand,ff) for ff in f])
-        R = np.array([R_v1(w,s,wg,t,ff,sigma) for ff in f])
-        L = np.array([L_v1(w,s,wg,t,ff,sigma) for ff in f])
+        C = np.array([C_v1(w,s,wg,t,eri) for eri in er])
+        G = np.array([G_v1(w,s,wg,t,eri,tandi,ff) for eri,tandi,ff in zip(er,tand,f)])
+        R = np.array([R_v1(w,s,wg,t,ff,sigmai) for ff,sigmai in zip(f,sigma)])
+        L = np.array([L_v1(w,s,wg,t,ff,sigmai) for ff,sigmai in zip(f,sigma)])
 
         # correction based on [2]
         # updating C
@@ -367,18 +410,19 @@ class CPW:
         x = 1 + (np.sqrt(er/erq)-1)*p*(f/fg)**2  # correction factor
         C_corr = (x-1)*(C - R*G/L/omega**2)
         C = C + C_corr
-        # updating R
-        R_corr = np.array([R_rad(w,s,wg,t,ff,er) for ff in f])
-        R = R + R_corr        
-        gamma = np.sqrt( (R + 1j*omega*L)*(G + 1j*omega*C) )
-      
+        # radiation resistance
+        R_corr = np.array([R_rad(w,s,wg,t,ff,eri) for ff,eri in zip(f,er)])
+
         # correction based on [3]
-        # updating alpha = Re{gamma}
-        f1 = 1 + 0.45*(w/d)**4
-        f2 = 1.87 + 273.18/( 47.6 + 1.29*(er-9)**2 )
-        f3 = wg/wtot
-        fg1 = 2*c0/1.1/wtot/np.sqrt(2*(er-1))
-        gamma = gamma.real*( 1 + f1*f2*f3/(1 + 19.83*(f/fg1-1)**2) ) + 1j*gamma.imag
+        # Since alpha_rad proportional to R_rad, we can scale R_rad with the same factor.
+        if self.phung_fit:
+            f1 = 1 + 0.45*(w/d)**4
+            f2 = 1.87 + 273.18/( 47.6 + 1.29*(er-9)**2 )
+            f3 = wg/wtot
+            fg1 = 2*c0/1.1/wtot/np.sqrt(2*(er-1))
+            R_corr = R_corr*( 1 + f1*f2*f3/(1 + 19.83*(f/fg1-1)**2) )
+        R = R + R_corr
+        gamma = np.sqrt( (R + 1j*omega*L)*(G + 1j*omega*C) )
 
         # Final results
         self.gamma = gamma
@@ -402,9 +446,11 @@ class CPW:
     def update_jac(self):
         '''
         Updates the jacobian of the parameters with respect to the input parameters.
-            
+
+        A material property given per frequency is differentiated at each frequency with
+        respect to the value acting there. The shape of the jacobian stays (N,2,7) either way.
         '''
-        
+
         # these are the input parameters to which the Jacobian is computed with respect to (same order!).
         w       = self.w
         s       = self.s
@@ -416,13 +462,23 @@ class CPW:
         
         N = len(self.f)
         M = 2*N
-        x   = [w, s, wg, t, sigma, er, tand]  # the order of the input parameters for the Jacobian
-        # Finite-difference step, proportional to each parameter so that they all get the
-        # same relative nudge. A single fixed step cannot suit both sigma (order 1e7) and a
-        # dimension (order 1e-6). Parameters that are exactly zero fall back to an absolute step.
-        rel = 1e-6
-        big_J = so.approx_fprime(x, get_all_paras, rel*np.where(np.abs(x) > 0, np.abs(x), 1), self)
-        
+        # one row per input parameter, one value per frequency, in the order of the Jacobian
+        ones  = np.ones_like(self.f)
+        x     = [ones*p for p in [w, s, wg, t, sigma, er, tand]]
+        big_J = approx_jac(x, get_all_paras, self)
+
+        # undo the changes done by approx_jac(), which leaves the model at its last nudged
+        # parameter set, and evaluate once more so that the outputs are the nominal ones
+        # again. jac_Gamma below needs that nominal Z0.
+        self.w     = w
+        self.s     = s
+        self.wg    = wg
+        self.t     = t
+        self.sigma = sigma
+        self.er    = er
+        self.tand  = tand
+        self.update()
+
         # split the jacobian for the corresponding output parameters
         self.jac_gamma = big_J[:M].reshape((N,2,-1))
         self.jac_ereff = big_J[M:2*M].reshape((N,2,-1))
@@ -433,16 +489,6 @@ class CPW:
         self.jac_L     = big_J[4*M:5*M:2].reshape((N,1,-1))
         self.jac_G     = big_J[5*M:6*M:2].reshape((N,1,-1))
         self.jac_C     = big_J[6*M:7*M:2].reshape((N,1,-1))
-        
-        # undo the changes done by the function so.approx_fprime().
-        self.w     = w
-        self.s     = s
-        self.wg    = wg
-        self.t     = t
-        self.sigma = sigma
-        self.er    = er
-        self.tand  = tand
-        
 
 if __name__=='__main__':
     import matplotlib.pyplot as plt # for plotting
